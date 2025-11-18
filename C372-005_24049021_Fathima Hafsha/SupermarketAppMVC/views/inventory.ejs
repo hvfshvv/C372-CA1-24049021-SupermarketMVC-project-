@@ -1,33 +1,40 @@
-<%- include('partials/header') %>
+<%- include("partials/header"); %>
 
-<h2>Inventory (Admin)</h2>
-<a href="/addproduct">+ Add Product</a>
+<h1 class="mb-4">Inventory Management</h1>
 
-<table border="1" cellpadding="10">
-    <tr>
-        <th>ID</th>
-        <th>Name</th>
-        <th>Qty</th>
-        <th>Price</th>
-        <th>Image</th>
-        <th>Actions</th>
-    </tr>
+<a href="/addproduct" class="btn btn-success mb-3">+ Add Product</a>
 
-    <% products.forEach(p => { %>
-        <tr class="<%= p.lowStock ? 'low-stock' : '' %>">
-            <td><%= p.id %></td>
-            <td><%= p.productName %></td>
-            <td><%= p.quantity %></td>
-            <td>$<%= p.price %></td>
-            <td><img src="/images/<%= p.image %>" width="80"></td>
-            <td>
-                <a href="/updateproduct/<%= p.id %>">Edit</a> |
-                <form action="/deleteproduct/<%= p.id %>?_method=DELETE" method="POST" style="display:inline;">
-                    <button type="submit" onclick="return confirm('Delete?')">Delete</button>
-                </form>
-            </td>
+<table class="table table-bordered table-striped">
+    <thead class="table-dark">
+        <tr>
+            <th>ID</th>
+            <th>Image</th>
+            <th>Name</th>
+            <th>Qty</th>
+            <th>Price ($)</th>
+            <th>Actions</th>
         </tr>
-    <% }) %>
+    </thead>
+
+    <tbody>
+        <% products.forEach(p => { %>
+            <tr class="<%= p.quantity < 10 ? 'table-danger' : '' %>">
+                <td><%= p.id %></td>
+                <td><img src="/images/<%= p.image %>" style="height:60px; width:60px; object-fit:cover;"></td>
+                <td><%= p.productName %></td>
+                <td><%= p.quantity %></td>
+                <td><%= p.price %></td>
+
+                <td>
+                    <a href="/updateproduct/<%= p.id %>" class="btn btn-warning btn-sm">Edit</a>
+
+                    <form action="/deleteproduct/<%= p.id %>" method="POST" style="display:inline;">
+                        <button class="btn btn-danger btn-sm">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        <% }) %>
+    </tbody>
 </table>
 
-<%- include('partials/footer') %>
+<%- include("partials/footer"); %>

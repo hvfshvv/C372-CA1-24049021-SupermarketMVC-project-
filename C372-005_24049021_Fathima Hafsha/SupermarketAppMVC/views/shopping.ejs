@@ -1,22 +1,43 @@
-<%- include('partials/header') %>
+<%- include("partials/header"); %>
 
-<h2>Shopping</h2>
+<h2 class="fw-bold mb-4">Supermarket Products</h2>
 
-<div class="product-container">
+<div class="row">
     <% products.forEach(p => { %>
-        <div class="product-card">
-            <img src="/images/<%= p.image %>">
-            <h3><%= p.productName %></h3>
-            <p>Price: $<%= p.price %></p>
-            <p>Stock: <%= p.quantity %></p>
+        <div class="col-md-4 mb-4">
 
-            <form action="/add-to-cart/<%= p.id %>" method="POST">
-                <input type="number" name="quantity" value="1" min="1">
-                <button type="submit">Add to Cart</button>
-            </form>
+            <div class="card shadow-sm h-100">
+
+                <!-- Product Image -->
+                <img src="/images/<%= p.image %>" class="card-img-top" style="height: 220px; object-fit: cover;">
+
+                <div class="card-body d-flex flex-column">
+
+                    <h5 class="card-title fw-bold"><%= p.productName %></h5>
+
+                    <p class="card-text text-muted">
+                        <strong>Price:</strong> $<%= p.price.toFixed(2) %><br>
+                        <strong>Stock:</strong>
+                        <% if (p.lowStock) { %>
+                            <span class="text-danger">Low Stock!</span>
+                        <% } else { %>
+                            <%= p.quantity %>
+                        <% } %>
+                    </p>
+
+                    <div class="mt-auto">
+                        <a href="/product/<%= p.id %>" class="btn btn-outline-primary w-100 mb-2">View Details</a>
+
+                        <form action="/add-to-cart/<%= p.id %>" method="POST">
+                            <button class="btn btn-success w-100">Add to Cart</button>
+                        </form>
+                    </div>
+
+                </div>
+            </div>
+
         </div>
-    <% }) %>
+    <% }); %>
 </div>
 
-
-<%- include('partials/footer') %>
+<%- include("partials/footer"); %>

@@ -3,21 +3,23 @@ const session = require('express-session');
 const flash = require('connect-flash');
 const multer = require('multer');
 const methodOverride = require('method-override');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
 
-// Controllers
+// ----------------------------
+// Controllers + Models
+// ----------------------------
 const ProductController = require('./controllers/productController');
 const CartController = require('./controllers/cartController');
 const UserController = require('./controllers/userController');
 
-// Models
 const Product = require('./models/Product');
 
-// ------------------------------------
-// FILE UPLOAD (multer)
-// ------------------------------------
+// ----------------------------
+// Multer (file upload)
+// ----------------------------
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, 'public/images'),
     filename: (req, file, cb) =>
@@ -25,54 +27,64 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// ------------------------------------
-// MIDDLEWARE
-// ------------------------------------
-app.use(methodOverride('_method'));
-app.use(express.static('public'));
+// ----------------------------
+// Express config
+// ----------------------------
+app.set('views', path.join(__dirname, 'views'));   // 👈 IMPORTANT
 app.set('view engine', 'ejs');
-app.use(express.urlencoded({ extended: false }));
 
+app.use(express.static('public'));
+app.use(express.urlencoded({ extended: false }));
+app.use(methodOverride('_method'));
+
+// ----------------------------
+// Session + Flash
+// ----------------------------
 app.use(session({
-    secret: 'supersecret',
+    secret: 'secret',
     resave: false,
-    saveUninitialized: true
+    saveUninitialized: true,
+    cookie: { maxAge: 1000 * 60 * 60 * 24 * 7 }
 }));
 app.use(flash());
 
-// Make session and flash available in EJS
+// Make user, messages, cartCount available in all EJS
 app.use((req, res, next) => {
     res.locals.user = req.session.user || null;
     res.locals.messages = req.flash();
+    res.locals.cartCount = (req.session.cart || []).length;
     next();
 });
 
-// Login check
+// ----------------------------
+// Middleware
+// ----------------------------
 const checkAuthenticated = (req, res, next) => {
     if (req.session.user) return next();
-    req.flash('error', 'Please log in first.');
+    req.flash('error', 'Please log in first');
     res.redirect('/login');
 };
 
-// Admin check
 const checkAdmin = (req, res, next) => {
-    if (req.session.user?.role === 'admin') return next();
-    req.flash('error', 'Access denied.');
+    if (req.session.user && req.session.user.role === 'admin') return next();
+    req.flash('error', 'Access denied');
     res.redirect('/shopping');
 };
 
-// ------------------------------------
+// ----------------------------
 // ROUTES
-// ------------------------------------
+// ----------------------------
 
-// Home redirect
+// Home – redirect based on role
 app.get('/', (req, res) => {
-    if (req.session.user?.role === 'admin') return res.redirect('/inventory');
-    if (req.session.user) return res.redirect('/shopping');
-    res.redirect('/login');
+    if (req.session && req.session.user) {
+        if (req.session.user.role === 'admin') return res.redirect('/inventory');
+        return res.redirect('/shopping');
+    }
+    return res.redirect('/login');
 });
 
-// USER AUTH
+// Auth (UserController)
 app.get('/register', UserController.registerForm);
 app.post('/register', UserController.register);
 
@@ -81,37 +93,89 @@ app.post('/login', UserController.login);
 
 app.get('/logout', UserController.logout);
 
-// PRODUCT LISTING
+// Product listing
 app.get('/inventory', checkAuthenticated, checkAdmin, ProductController.list);
 app.get('/shopping', ProductController.list);
 
-// PRODUCT DETAILS
+// Product details
 app.get('/product/:id', ProductController.getById);
 
-// PRODUCT CRUD
+// Product CRUD (admin only)
 app.get('/addproduct', checkAuthenticated, checkAdmin, (req, res) => {
-    res.render('addProduct');
-});
-app.post('/addproduct', checkAuthenticated, checkAdmin, upload.single('image'), ProductController.add);
-
-app.get('/updateproduct/:id', checkAuthenticated, checkAdmin, (req, res) => {
-    Product.getById(req.params.id, (err, product) => {
-        if (!product) return res.status(404).send('Product not found');
-        res.render('updateProduct', { product });
-    });
+    res.render('addProduct', { user: req.session.user });
 });
 
-app.put('/updateproduct/:id', checkAuthenticated, checkAdmin, upload.single('image'), ProductController.update);
-app.delete('/deleteproduct/:id', checkAuthenticated, checkAdmin, ProductController.delete);
+app.post('/addproduct',
+    checkAuthenticated,
+    checkAdmin,
+    upload.single('image'),
+    ProductController.add
+);
 
+app.get('/updateproduct/:id',
+    checkAuthenticated,
+    checkAdmin,
+    (req, res) => {
+        const id = req.params.id;
+        Product.getById(id, (err, product) => {
+            if (err) {
+                console.error(err);
+                return res.status(500).send('Error retrieving product');
+            }
+            if (!product) return res.status(404).send('Product not found');
+            res.render('updateProduct', { product, user: req.session.user });
+        });
+    }
+);
+
+app.post('/updateproduct/:id',
+    checkAuthenticated,
+    checkAdmin,
+    upload.single('image'),
+    ProductController.update
+);
+
+app.put('/updateproduct/:id',
+    checkAuthenticated,
+    checkAdmin,
+    upload.single('image'),
+    ProductController.update
+);
+
+app.get('/deleteproduct/:id',
+    checkAuthenticated,
+    checkAdmin,
+    ProductController.delete
+);
+
+app.post('/deleteproduct/:id',
+    checkAuthenticated,
+    checkAdmin,
+    ProductController.delete
+);
+
+app.delete('/deleteproduct/:id',
+    checkAuthenticated,
+    checkAdmin,
+    ProductController.delete
+);
+
+// Cart routes (CartController)
 // CART ROUTES
 app.post('/add-to-cart/:id', checkAuthenticated, CartController.add);
 app.get('/cart', checkAuthenticated, CartController.view);
 app.post('/cart/delete/:id', checkAuthenticated, CartController.delete);
 app.delete('/cart/delete/:id', checkAuthenticated, CartController.delete);
 
-// ------------------------------------
-// SERVER START
-// ------------------------------------
+// Checkout
+app.get('/checkout', checkAuthenticated, CartController.checkoutPage);
+app.post('/checkout/confirm', checkAuthenticated, CartController.confirmOrder);
+app.get('/checkout/success', checkAuthenticated, CartController.successPage);
+
+// ----------------------------
+// Server start
+// ----------------------------
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+app.listen(PORT, () =>
+    console.log(`Server running on http://localhost:${PORT}`)
+);
